@@ -66,7 +66,7 @@ $Aapt2 = Join-Path $SdkRoot "build-tools\$BuildTools\aapt2.exe"
 $D8 = Join-Path $SdkRoot "build-tools\$BuildTools\d8.bat"
 $ZipAlign = Join-Path $SdkRoot "build-tools\$BuildTools\zipalign.exe"
 $ApkSigner = Join-Path $SdkRoot "build-tools\$BuildTools\apksigner.bat"
-$KeyStore = Join-Path $Root "mp3player-debug.keystore"
+$KeyStore = Join-Path $Root "mp3player.keystore"
 
 Require-Tool $AndroidJar "android.jar"
 Require-Tool $Aapt2 "aapt2"
@@ -102,8 +102,9 @@ Invoke-Checked { & $Aapt2 link `
 $JavaFiles = Get-ChildItem -Path (Join-Path $Root "app\src\main\java") -Filter *.java -Recurse | ForEach-Object { $_.FullName }
 Invoke-Checked { & javac --release 17 -encoding UTF-8 -classpath $AndroidJar -d $ClassDir $JavaFiles }
 
-$ClassFiles = Get-ChildItem -Path $ClassDir -Filter *.class -Recurse | ForEach-Object { $_.FullName }
-Invoke-Checked { & $D8 --min-api 23 --classpath $AndroidJar --output $DexDir $ClassFiles }
+$ClassesJar = Join-Path $BuildDir "classes.jar"
+Invoke-Checked { & jar cf $ClassesJar -C $ClassDir . }
+Invoke-Checked { & $D8 --min-api 23 --classpath $AndroidJar --output $DexDir $ClassesJar }
 
 Invoke-Checked { & jar uf $UnsignedApk -C $DexDir classes.dex }
 
@@ -116,11 +117,11 @@ if (-not (Test-Path -LiteralPath $KeyStore)) {
         -keyalg RSA `
         -keysize 2048 `
         -validity 10000 `
-        -dname "CN=MP3 Player, OU=Local, O=Rasul, L=Local, S=Local, C=RU"
+        -dname "CN=MP3 Player, OU=Local, O=MP3 Player, L=Local, S=Local, C=RU"
 }
 
 $AlignedApk = Join-Path $BuildDir "mp3-player-aligned.apk"
-$SignedApk = Join-Path $OutputDir "MP3-Player-debug.apk"
+$SignedApk = Join-Path $OutputDir "MP3-Player.apk"
 
 Invoke-Checked { & $ZipAlign -f -p 4 $UnsignedApk $AlignedApk }
 Invoke-Checked { & $ApkSigner sign `
