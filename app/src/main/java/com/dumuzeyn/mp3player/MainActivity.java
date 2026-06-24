@@ -26,9 +26,12 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
 import android.widget.ImageView;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
+import android.widget.Spinner;
 import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -957,7 +960,17 @@ public class MainActivity extends Activity {
 
         @Override
         public void onClick(View view) {
-            MainActivity.m51$$Nest$mopenFullPlayer(MainActivity.this);
+            if (MainActivity.this.animations) {
+                view.animate().scaleX(0.985f).scaleY(0.985f).setDuration(35L).withEndAction(new Runnable() {
+                    @Override
+                    public void run() {
+                        view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(60L).start();
+                        MainActivity.m51$$Nest$mopenFullPlayer(MainActivity.this);
+                    }
+                }).start();
+            } else {
+                MainActivity.m51$$Nest$mopenFullPlayer(MainActivity.this);
+            }
         }
     }
 
@@ -1130,20 +1143,32 @@ public class MainActivity extends Activity {
         textViewText.setGravity(8388627);
         textViewText.setPadding(dp(4), dp(18), dp(4), dp(6));
         this.list.addView(textViewText);
-        LinearLayout linearLayoutRow = row();
-        Button button = button("English");
-        button.setGravity(8388627);
-        button.setPadding(dp(18), 0, dp(12), 0);
-        applyButtonColors(button, english() ? this.fg : this.bg, english() ? this.bg : this.fg);
-        button.setOnClickListener(new AnonymousClass17());
-        linearLayoutRow.addView(button, new LinearLayout.LayoutParams(0, dp(56), 1.0f));
-        Button button2 = button("Русский");
-        button2.setGravity(8388627);
-        button2.setPadding(dp(18), 0, dp(12), 0);
-        applyButtonColors(button2, english() ? this.bg : this.fg, english() ? this.fg : this.bg);
-        button2.setOnClickListener(new AnonymousClass18());
-        linearLayoutRow.addView(button2, new LinearLayout.LayoutParams(0, dp(56), 1.0f));
-        this.list.addView(spaced(linearLayoutRow));
+        Spinner languageSpinner = new Spinner(this);
+        String[] languages = new String[]{"English", "Русский"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, languages);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        languageSpinner.setAdapter(adapter);
+        languageSpinner.setSelection(english() ? 0 : 1);
+        setSurface(languageSpinner, this.bg, true);
+        languageSpinner.setPadding(dp(12), 0, dp(12), 0);
+        languageSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                String next = position == 0 ? "en" : "ru";
+                if (!next.equals(MainActivity.this.language)) {
+                    MainActivity.this.language = next;
+                    MainActivity.this.saveState();
+                    MainActivity.this.buildUi();
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+            }
+        });
+        LinearLayout.LayoutParams languageParams = new LinearLayout.LayoutParams(-1, dp(56));
+        languageParams.setMargins(0, dp(5), 0, dp(10));
+        this.list.addView(languageSpinner, languageParams);
         addSettingsButton(tr("Delete all songs from app", "Удалить все песни из приложения"), new AnonymousClass20());
         addSettingsButton(tr("Delete all playlists", "Удалить все плейлисты"), new AnonymousClass21());
         addSettingsButton(tr("GitHub project", "GitHub проект"), new AnonymousClass19());
@@ -2299,11 +2324,12 @@ public class MainActivity extends Activity {
         linearLayout.addView(linearLayout2, new LinearLayout.LayoutParams(0, dp(70), 1.0f));
         Button buttonIcon = icon(hashSet.contains(track.uri) ? "✔" : "+");
         buttonIcon.setOnClickListener(new AnonymousClass53(this, hashSet, track, linearLayout, textViewText, buttonIcon));
-        applyButtonColors(buttonIcon, hashSet.contains(track.uri) ? this.fg : this.bg, hashSet.contains(track.uri) ? this.bg : this.fg);
+        applyButtonColors(buttonIcon, this.bg, this.fg);
         linearLayout.addView(buttonIcon, square(48));
         Button buttonIcon2 = icon((isCurrent(track) && this.playing) ? "Ⅱ" : "▶");
         buttonIcon2.setTag(track.uri);
         buttonIcon2.setOnClickListener(new AnonymousClass54(this, track));
+        applyButtonColors(buttonIcon2, this.bg, this.fg);
         linearLayout.addView(buttonIcon2, square(48));
         return spaced(linearLayout);
     }
@@ -2341,10 +2367,7 @@ public class MainActivity extends Activity {
             MainActivity mainActivity3 = this.this$0;
             textView.setTextColor(zContains ? MainActivity.m0$$Nest$fgetbg(mainActivity3) : MainActivity.m6$$Nest$fgetfg(mainActivity3));
             this.val$mark.setText(zContains ? "✔" : "+");
-            MainActivity mainActivity4 = this.this$0;
-            Button button = this.val$mark;
-            MainActivity mainActivity5 = this.this$0;
-            MainActivity.m31$$Nest$mapplyButtonColors(mainActivity4, button, zContains ? MainActivity.m6$$Nest$fgetfg(mainActivity5) : MainActivity.m0$$Nest$fgetbg(mainActivity5), zContains ? MainActivity.m0$$Nest$fgetbg(this.this$0) : MainActivity.m6$$Nest$fgetfg(this.this$0));
+            MainActivity.m31$$Nest$mapplyButtonColors(this.this$0, this.val$mark, MainActivity.m0$$Nest$fgetbg(this.this$0), MainActivity.m6$$Nest$fgetfg(this.this$0));
         }
     }
 
@@ -2359,7 +2382,11 @@ public class MainActivity extends Activity {
 
         @Override
         public void onClick(View view) {
-            MainActivity.m62$$Nest$mplayTrack(this.this$0, this.val$track, false);
+            if (MainActivity.m45$$Nest$misCurrent(this.this$0, this.val$track)) {
+                MainActivity.m77$$Nest$mtoggleCurrent(this.this$0);
+            } else {
+                MainActivity.m62$$Nest$mplayTrack(this.this$0, this.val$track, false);
+            }
             this.this$0.syncPickPlayButtons(this.val$track);
         }
     }
@@ -2914,6 +2941,10 @@ public class MainActivity extends Activity {
         linearLayoutRow4.addView(buttonIcon5, square(68));
         linearLayout.addView(linearLayoutRow4, new LinearLayout.LayoutParams(-1, dp(112)));
         this.overlayHost.addView(frameLayout, new FrameLayout.LayoutParams(-1, -1));
+        if (this.animations) {
+            frameLayout.setTranslationY(getResources().getDisplayMetrics().heightPixels);
+            frameLayout.animate().translationY(0.0f).setDuration(145L).setInterpolator(new DecelerateInterpolator()).start();
+        }
     }
 
     class AnonymousClass70 implements View.OnClickListener {
@@ -3699,38 +3730,7 @@ public class MainActivity extends Activity {
         button.setMinWidth(0);
         button.setMinHeight(0);
         setSurface(button, this.bg, false);
-        attachPressAnimation(button);
         return button;
-    }
-
-    private void attachPressAnimation(final View view) {
-        view.setOnTouchListener(new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View touched, MotionEvent event) {
-                if (!MainActivity.this.animations) {
-                    touched.setScaleX(1.0f);
-                    touched.setScaleY(1.0f);
-                    touched.setAlpha(1.0f);
-                    return false;
-                }
-                int action = event.getActionMasked();
-                if (action == MotionEvent.ACTION_DOWN) {
-                    touched.animate().scaleX(0.96f).scaleY(0.96f).alpha(0.88f).setDuration(45L).start();
-                } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
-                    touched.animate().scaleX(1.0f).scaleY(1.0f).alpha(1.0f).setDuration(85L).setInterpolator(new DecelerateInterpolator()).start();
-                }
-                return false;
-            }
-        });
-    }
-
-    private void animateAppear(View view) {
-        if (!this.animations) {
-            return;
-        }
-        view.setAlpha(0.0f);
-        view.setTranslationY(dp(4));
-        view.animate().alpha(1.0f).translationY(0.0f).setDuration(110L).setInterpolator(new DecelerateInterpolator()).start();
     }
 
     private Button icon(String str) {
@@ -3776,7 +3776,6 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(-1, -2);
         layoutParams.setMargins(0, dp(5), 0, dp(5));
         view.setLayoutParams(layoutParams);
-        animateAppear(view);
         return view;
     }
 
@@ -3837,17 +3836,6 @@ public class MainActivity extends Activity {
         linearLayout.setPadding(dp(12), dp(12), dp(12), dp(12));
         setSurface(linearLayout, this.bg, true);
         linearLayout.setOnClickListener(new AnonymousClass88());
-        if (this.animations) {
-            linearLayout.setAlpha(0.0f);
-            linearLayout.setScaleX(0.98f);
-            linearLayout.setScaleY(0.98f);
-            linearLayout.post(new Runnable() {
-                @Override
-                public void run() {
-                    linearLayout.animate().alpha(1.0f).scaleX(1.0f).scaleY(1.0f).setDuration(115L).setInterpolator(new DecelerateInterpolator()).start();
-                }
-            });
-        }
         return linearLayout;
     }
 
