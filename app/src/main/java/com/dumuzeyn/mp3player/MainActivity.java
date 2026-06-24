@@ -15,9 +15,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputFilter;
 import android.text.TextUtils;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.DecelerateInterpolator;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -42,6 +45,7 @@ import org.json.JSONObject;
 
 public class MainActivity extends Activity {
     private static final String CUSTOM_TIMER = "customTimer";
+    private static final String ANIMATIONS = "animations";
     private static final String FAVORITES = "favorites";
     private static final String LANGUAGE = "language";
     private static final int PICK_AUDIO = 2001;
@@ -82,6 +86,7 @@ public class MainActivity extends Activity {
     private int customTimerMinutes = 10;
     private long sleepTimerEndsAt = 0;
     private boolean dark = false;
+    private boolean animations = true;
     private String language = "en";
     private float swipeStartX = 0.0f;
     private float swipeStartY = 0.0f;
@@ -433,6 +438,7 @@ public class MainActivity extends Activity {
         super.onCreate(bundle);
         this.prefs = getSharedPreferences(PREFS, 0);
         this.dark = "dark".equals(this.prefs.getString(THEME, "light"));
+        this.animations = this.prefs.getBoolean(ANIMATIONS, true);
         this.language = this.prefs.getString(LANGUAGE, "en");
         this.customTimerMinutes = this.prefs.getInt(CUSTOM_TIMER, 10);
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != 0) {
@@ -462,7 +468,7 @@ public class MainActivity extends Activity {
             JSONArray jSONArray = new JSONArray(this.prefs.getString(PLAYLISTS, "[]"));
             for (int i = 0; i < jSONArray.length(); i++) {
                 JSONObject jSONObject = jSONArray.getJSONObject(i);
-                Playlist playlist = new Playlist(jSONObject.optString("name", "Playlist"));
+                Playlist playlist = new Playlist(cleanPlaylistName(jSONObject.optString("name", "Playlist")));
                 JSONArray jSONArrayOptJSONArray = jSONObject.optJSONArray("songs");
                 if (jSONArrayOptJSONArray != null) {
                     for (int i2 = 0; i2 < jSONArrayOptJSONArray.length(); i2++) {
@@ -608,7 +614,7 @@ public class MainActivity extends Activity {
     }
 
     private void saveState() {
-        this.prefs.edit().putStringSet(FAVORITES, new HashSet(this.favorites)).putString(PLAYLISTS, playlistsJson()).putString(THEME, this.dark ? "dark" : "light").putString(LANGUAGE, this.language).putInt(CUSTOM_TIMER, this.customTimerMinutes).apply();
+        this.prefs.edit().putStringSet(FAVORITES, new HashSet(this.favorites)).putString(PLAYLISTS, playlistsJson()).putString(THEME, this.dark ? "dark" : "light").putBoolean(ANIMATIONS, this.animations).putString(LANGUAGE, this.language).putInt(CUSTOM_TIMER, this.customTimerMinutes).apply();
     }
 
     private String playlistsJson() {
@@ -770,6 +776,13 @@ public class MainActivity extends Activity {
         if (this.tabs == null || i == this.tabIndex || this.tabAnimating) {
             return;
         }
+        if (!this.animations) {
+            this.tabIndex = i;
+            this.search = "";
+            scrollTabsToActive(false, i);
+            render();
+            return;
+        }
         this.tabAnimating = true;
         int width = (this.root == null || this.root.getWidth() <= 0) ? getResources().getDisplayMetrics().widthPixels : this.root.getWidth();
         if (this.list == null) {
@@ -780,7 +793,7 @@ public class MainActivity extends Activity {
             return;
         }
         scrollTabsToActive(true, i);
-        this.list.animate().translationX(i2 < 0 ? width : -width).alpha(0.0f).setDuration(70L).withEndAction(new AnonymousClass4(this, i, i2, width)).start();
+        this.list.animate().translationX(i2 < 0 ? width : -width).alpha(0.0f).setDuration(48L).setInterpolator(new DecelerateInterpolator()).withEndAction(new AnonymousClass4(this, i, i2, width)).start();
     }
 
     class AnonymousClass4 implements Runnable {
@@ -803,7 +816,7 @@ public class MainActivity extends Activity {
             MainActivity.m67$$Nest$mrender(this.this$0);
             MainActivity.m7$$Nest$fgetlist(this.this$0).setTranslationX(this.val$direction < 0 ? -this.val$width : this.val$width);
             MainActivity.m7$$Nest$fgetlist(this.this$0).setAlpha(0.0f);
-            MainActivity.m7$$Nest$fgetlist(this.this$0).animate().translationX(0.0f).alpha(1.0f).setDuration(105L).withEndAction(new AnonymousClass1()).start();
+            MainActivity.m7$$Nest$fgetlist(this.this$0).animate().translationX(0.0f).alpha(1.0f).setDuration(92L).setInterpolator(new DecelerateInterpolator()).withEndAction(new AnonymousClass1()).start();
         }
 
         class AnonymousClass1 implements Runnable {
@@ -888,8 +901,13 @@ public class MainActivity extends Activity {
             this.tabsScroll.scrollTo(i, 0);
             return;
         }
+        if (!this.animations) {
+            this.tabsScroll.scrollTo(i, 0);
+            return;
+        }
         this.tabScrollAnimator = ValueAnimator.ofInt(scrollX, i);
-        this.tabScrollAnimator.setDuration(125L);
+        this.tabScrollAnimator.setDuration(96L);
+        this.tabScrollAnimator.setInterpolator(new DecelerateInterpolator());
         this.tabScrollAnimator.addUpdateListener(new AnonymousClass6());
         this.tabScrollAnimator.start();
     }
@@ -1100,6 +1118,14 @@ public class MainActivity extends Activity {
 
     private void renderSettings() {
         addSettingsButton(tr(this.dark ? "Switch to light theme" : "Switch to dark theme", this.dark ? "Светлая тема" : "Темная тема"), new AnonymousClass16());
+        addSettingsButton(tr(this.animations ? "Turn animations off" : "Turn animations on", this.animations ? "Отключить анимации" : "Включить анимации"), new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                MainActivity.this.animations = !MainActivity.this.animations;
+                MainActivity.this.saveState();
+                MainActivity.this.render();
+            }
+        });
         TextView textViewText = text(tr("Language", "Язык"), 18, true);
         textViewText.setGravity(8388627);
         textViewText.setPadding(dp(4), dp(18), dp(4), dp(6));
@@ -1118,9 +1144,9 @@ public class MainActivity extends Activity {
         button2.setOnClickListener(new AnonymousClass18());
         linearLayoutRow.addView(button2, new LinearLayout.LayoutParams(0, dp(56), 1.0f));
         this.list.addView(spaced(linearLayoutRow));
-        addSettingsButton(tr("GitHub project", "GitHub проект"), new AnonymousClass19());
         addSettingsButton(tr("Delete all songs from app", "Удалить все песни из приложения"), new AnonymousClass20());
         addSettingsButton(tr("Delete all playlists", "Удалить все плейлисты"), new AnonymousClass21());
+        addSettingsButton(tr("GitHub project", "GitHub проект"), new AnonymousClass19());
     }
 
     class AnonymousClass17 implements View.OnClickListener {
@@ -1190,7 +1216,11 @@ public class MainActivity extends Activity {
 
     private void openGithub() {
         try {
-            startActivity(new Intent("android.intent.action.VIEW", Uri.parse("https://github.com/dumuzeyn/MP3-player")));
+            Intent intent = new Intent("android.intent.action.VIEW", Uri.parse("https://github.com/dumuzeyn/MP3-player"));
+            intent.addCategory("android.intent.category.BROWSABLE");
+            if (intent.resolveActivity(getPackageManager()) != null) {
+                startActivity(intent);
+            }
         } catch (Exception e) {
         }
     }
@@ -1445,8 +1475,7 @@ public class MainActivity extends Activity {
             LinearLayout linearLayout2 = new LinearLayout(this);
             linearLayout2.setOrientation(1);
             TextView textViewText2 = text(playlist2.name, 22, true);
-            textViewText2.setSingleLine(true);
-            textViewText2.setEllipsize(TextUtils.TruncateAt.END);
+            makeMarquee(textViewText2);
             TextView textViewText3 = text(playlist2.uris.size() + " " + tr("songs", "песен"), 13, false);
             linearLayout2.addView(textViewText2);
             linearLayout2.addView(textViewText3);
@@ -1457,6 +1486,14 @@ public class MainActivity extends Activity {
             Button buttonShuffleButton = shuffleButton();
             buttonShuffleButton.setOnClickListener(new AnonymousClass29(this, playlist2));
             linearLayoutRow.addView(buttonShuffleButton, square(48));
+            Button rename = icon("✎");
+            rename.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    MainActivity.this.renamePlaylistDialog(playlist2);
+                }
+            });
+            linearLayoutRow.addView(rename, square(48));
             Button buttonIcon2 = icon("×");
             buttonIcon2.setOnClickListener(new AnonymousClass30(this, playlist2));
             linearLayoutRow.addView(buttonIcon2, square(48));
@@ -1706,7 +1743,9 @@ public class MainActivity extends Activity {
         FrameLayout frameLayoutShade = shade();
         LinearLayout linearLayoutPanelCard = panelCard();
         LinearLayout linearLayoutRow = row();
-        linearLayoutRow.addView(text(str, 20, true), new LinearLayout.LayoutParams(0, dp(58), 1.0f));
+        TextView panelTitle = text(str, 20, true);
+        makeMarquee(panelTitle);
+        linearLayoutRow.addView(panelTitle, new LinearLayout.LayoutParams(0, dp(58), 1.0f));
         Button buttonIcon = icon("▶");
         buttonIcon.setOnClickListener(new AnonymousClass36(this, arrayList, frameLayoutShade, str, panelAction));
         linearLayoutRow.addView(buttonIcon, square(52));
@@ -2263,6 +2302,7 @@ public class MainActivity extends Activity {
         applyButtonColors(buttonIcon, hashSet.contains(track.uri) ? this.fg : this.bg, hashSet.contains(track.uri) ? this.bg : this.fg);
         linearLayout.addView(buttonIcon, square(48));
         Button buttonIcon2 = icon((isCurrent(track) && this.playing) ? "Ⅱ" : "▶");
+        buttonIcon2.setTag(track.uri);
         buttonIcon2.setOnClickListener(new AnonymousClass54(this, track));
         linearLayout.addView(buttonIcon2, square(48));
         return spaced(linearLayout);
@@ -2320,7 +2360,27 @@ public class MainActivity extends Activity {
         @Override
         public void onClick(View view) {
             MainActivity.m62$$Nest$mplayTrack(this.this$0, this.val$track, false);
-            ((Button) view).setText("Ⅱ");
+            this.this$0.syncPickPlayButtons(this.val$track);
+        }
+    }
+
+    private void syncPickPlayButtons(Track activeTrack) {
+        syncPickPlayButtons(this.overlayHost, activeTrack == null ? "" : activeTrack.uri);
+    }
+
+    private void syncPickPlayButtons(View view, String activeUri) {
+        if (view == null) {
+            return;
+        }
+        if (view instanceof Button && ((Button) view).getTag() instanceof String) {
+            String uri = (String) ((Button) view).getTag();
+            ((Button) view).setText(uri.equals(activeUri) && this.playing ? "Ⅱ" : "▶");
+        }
+        if (view instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                syncPickPlayButtons(group.getChildAt(i), activeUri);
+            }
         }
     }
 
@@ -2506,7 +2566,7 @@ public class MainActivity extends Activity {
 
         @Override
         public void done(String str) {
-            String strTrim = str.trim();
+            String strTrim = MainActivity.this.cleanPlaylistName(str);
             if (strTrim.isEmpty()) {
                 strTrim = MainActivity.m79$$Nest$mtr(this.this$0, "Playlist", "Плейлист");
             }
@@ -2576,7 +2636,7 @@ public class MainActivity extends Activity {
 
         @Override
         public void done(String str) {
-            String strTrim = str.trim();
+            String strTrim = MainActivity.this.cleanPlaylistName(str);
             ArrayList arrayListM14$$Nest$fgetplaylists = MainActivity.m14$$Nest$fgetplaylists(MainActivity.this);
             if (strTrim.isEmpty()) {
                 strTrim = MainActivity.m79$$Nest$mtr(MainActivity.this, "Playlist", "Плейлист");
@@ -2589,6 +2649,26 @@ public class MainActivity extends Activity {
 
     private void createPlaylistDialog() {
         showInputPanel(tr("Create playlist", "Создать плейлист"), tr("Playlist name", "Название плейлиста"), "", false, new AnonymousClass64());
+    }
+
+    private void renamePlaylistDialog(final Playlist playlist) {
+        showInputPanel(tr("Rename playlist", "Переименовать плейлист"), tr("Playlist name", "Название плейлиста"), playlist.name, false, new InputDone() {
+            @Override
+            public void done(String value) {
+                String name = cleanPlaylistName(value);
+                playlist.name = name.isEmpty() ? tr("Playlist", "Плейлист") : name;
+                saveState();
+                render();
+            }
+        });
+    }
+
+    private String cleanPlaylistName(String value) {
+        if (value == null) {
+            return "";
+        }
+        String cleaned = value.replaceAll("[\\p{Cntrl}&&[^\n\t]]", "").replace('\n', ' ').replace('\t', ' ').trim();
+        return cleaned.length() > 80 ? cleaned.substring(0, 80).trim() : cleaned;
     }
 
     private void openSearch() {
@@ -2605,6 +2685,7 @@ public class MainActivity extends Activity {
         editText.setTextSize(18.0f);
         editText.setPadding(dp(14), 0, dp(14), 0);
         editText.setInputType(1);
+        editText.setFilters(new InputFilter[]{new InputFilter.LengthFilter(80)});
         setSurface(editText, this.panel, true);
         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(-1, dp(58));
         layoutParams.setMargins(0, dp(10), 0, dp(16));
@@ -2679,6 +2760,7 @@ public class MainActivity extends Activity {
         editText.setTextSize(18.0f);
         editText.setPadding(dp(14), 0, dp(14), 0);
         editText.setInputType(z ? 2 : 1);
+        editText.setFilters(new InputFilter[]{new InputFilter.LengthFilter(z ? 3 : 80)});
         setSurface(editText, this.panel, true);
         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(-1, dp(58));
         layoutParams.setMargins(0, dp(10), 0, dp(16));
@@ -3546,6 +3628,9 @@ public class MainActivity extends Activity {
     }
 
     private void addTrack(Uri uri) {
+        if (!isSafeAudioUri(uri)) {
+            return;
+        }
         try {
             getContentResolver().takePersistableUriPermission(uri, 1);
         } catch (Exception e) {
@@ -3558,6 +3643,18 @@ public class MainActivity extends Activity {
             }
         }
         this.tracks.add(TrackStore.fromUri(this, uri));
+    }
+
+    private boolean isSafeAudioUri(Uri uri) {
+        if (uri == null || uri.getScheme() == null || !"content".equalsIgnoreCase(uri.getScheme())) {
+            return false;
+        }
+        try {
+            String type = getContentResolver().getType(uri);
+            return type == null || type.toLowerCase(Locale.ROOT).startsWith("audio/");
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     private LinearLayout row() {
@@ -3578,6 +3675,15 @@ public class MainActivity extends Activity {
         return textView;
     }
 
+    private void makeMarquee(TextView textView) {
+        textView.setSingleLine(true);
+        textView.setEllipsize(TextUtils.TruncateAt.MARQUEE);
+        textView.setMarqueeRepeatLimit(-1);
+        textView.setSelected(true);
+        textView.setFocusable(true);
+        textView.setFocusableInTouchMode(true);
+    }
+
     private Button button(String str) {
         Button button = new Button(this);
         button.setText(str);
@@ -3593,7 +3699,38 @@ public class MainActivity extends Activity {
         button.setMinWidth(0);
         button.setMinHeight(0);
         setSurface(button, this.bg, false);
+        attachPressAnimation(button);
         return button;
+    }
+
+    private void attachPressAnimation(final View view) {
+        view.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View touched, MotionEvent event) {
+                if (!MainActivity.this.animations) {
+                    touched.setScaleX(1.0f);
+                    touched.setScaleY(1.0f);
+                    touched.setAlpha(1.0f);
+                    return false;
+                }
+                int action = event.getActionMasked();
+                if (action == MotionEvent.ACTION_DOWN) {
+                    touched.animate().scaleX(0.96f).scaleY(0.96f).alpha(0.88f).setDuration(45L).start();
+                } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+                    touched.animate().scaleX(1.0f).scaleY(1.0f).alpha(1.0f).setDuration(85L).setInterpolator(new DecelerateInterpolator()).start();
+                }
+                return false;
+            }
+        });
+    }
+
+    private void animateAppear(View view) {
+        if (!this.animations) {
+            return;
+        }
+        view.setAlpha(0.0f);
+        view.setTranslationY(dp(4));
+        view.animate().alpha(1.0f).translationY(0.0f).setDuration(110L).setInterpolator(new DecelerateInterpolator()).start();
     }
 
     private Button icon(String str) {
@@ -3639,6 +3776,7 @@ public class MainActivity extends Activity {
         LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(-1, -2);
         layoutParams.setMargins(0, dp(5), 0, dp(5));
         view.setLayoutParams(layoutParams);
+        animateAppear(view);
         return view;
     }
 
@@ -3699,6 +3837,17 @@ public class MainActivity extends Activity {
         linearLayout.setPadding(dp(12), dp(12), dp(12), dp(12));
         setSurface(linearLayout, this.bg, true);
         linearLayout.setOnClickListener(new AnonymousClass88());
+        if (this.animations) {
+            linearLayout.setAlpha(0.0f);
+            linearLayout.setScaleX(0.98f);
+            linearLayout.setScaleY(0.98f);
+            linearLayout.post(new Runnable() {
+                @Override
+                public void run() {
+                    linearLayout.animate().alpha(1.0f).scaleX(1.0f).scaleY(1.0f).setDuration(115L).setInterpolator(new DecelerateInterpolator()).start();
+                }
+            });
+        }
         return linearLayout;
     }
 
@@ -3793,7 +3942,7 @@ public class MainActivity extends Activity {
     }
 
     private static class Playlist {
-        final String name;
+        String name;
         final ArrayList<String> uris = new ArrayList<>();
 
         Playlist(String str) {
