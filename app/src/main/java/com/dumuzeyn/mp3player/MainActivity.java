@@ -465,6 +465,9 @@ public class MainActivity extends Activity {
         this.dark = "dark".equals(this.prefs.getString(THEME, "light"));
         this.animations = this.prefs.getBoolean(ANIMATIONS, true);
         this.language = this.prefs.getString(LANGUAGE, "en");
+        if (!"en".equals(this.language) && !"ru".equals(this.language)) {
+            this.language = "en";
+        }
         this.customTimerMinutes = this.prefs.getInt(CUSTOM_TIMER, 10);
         this.resumeWindowMinutes = Math.max(0, this.prefs.getInt(RESUME_WINDOW_MINUTES, 120));
         updateLauncherIcon();
@@ -599,20 +602,16 @@ public class MainActivity extends Activity {
         return "en".equals(this.language);
     }
 
-    private boolean symbols() {
-        return "sym".equals(this.language);
-    }
-
     private String tr(String str, String str2) {
-        return symbols() ? str : english() ? str : str2;
+        return english() ? str : str2;
     }
 
     private String tr3(String str, String str2, String str3) {
-        return symbols() ? str3 : english() ? str : str2;
+        return english() ? str : str2;
     }
 
     private String languageName() {
-        return symbols() ? "◐" : english() ? "English" : "Русский";
+        return english() ? "English" : "Русский";
     }
 
     private void refreshTabLabels() {
@@ -1344,15 +1343,6 @@ public class MainActivity extends Activity {
             @Override
             public void run() {
                 MainActivity.this.language = "ru";
-                MainActivity.this.saveState();
-                MainActivity.this.overlayHost.removeView(frameLayoutShade);
-                MainActivity.this.buildUi();
-            }
-        });
-        addChoiceButton(linearLayoutPanelCard, "◐", symbols(), new Runnable() {
-            @Override
-            public void run() {
-                MainActivity.this.language = "sym";
                 MainActivity.this.saveState();
                 MainActivity.this.overlayHost.removeView(frameLayoutShade);
                 MainActivity.this.buildUi();
