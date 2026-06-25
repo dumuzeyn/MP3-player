@@ -1,7 +1,7 @@
 ﻿# MP3 Player APK
 
 <p align="center">
-  <a href="https://github.com/dumuzeyn/MP3-player/raw/main/output/MP3-Player.apk">
+  <a href="https://github.com/dumuzeyn/MP3-player/raw/main/output/MP3-Player.apk?v=1.1">
     <img src="https://img.shields.io/badge/Скачать_APK-MP3--Player.apk-black?style=for-the-badge" alt="Скачать APK">
   </a>
 </p>
@@ -28,7 +28,7 @@ output/MP3-Player-test.apk
 
 Прямая ссылка:
 
-[Скачать MP3-Player.apk](https://github.com/dumuzeyn/MP3-player/raw/main/output/MP3-Player.apk)
+[Скачать MP3-Player.apk](https://github.com/dumuzeyn/MP3-player/raw/main/output/MP3-Player.apk?v=1.1)
 
 Если Android предупреждает об установке из неизвестного источника, нужно разрешить установку APK для приложения, через которое открыт файл. Это стандартное поведение Android для приложений не из магазина.
 

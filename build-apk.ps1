@@ -102,8 +102,8 @@ $AaptLinkArgs = @(
     "--manifest", (Join-Path $Root "app\src\main\AndroidManifest.xml"),
     "--min-sdk-version", "23",
     "--target-sdk-version", "35",
-    "--version-code", "1",
-    "--version-name", "1.0",
+    "--version-code", "2",
+    "--version-name", "1.1",
     "--java", $GenDir
 )
 $AssetsDir = Join-Path $Root "app\src\main\assets"
