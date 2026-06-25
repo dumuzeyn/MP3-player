@@ -1,6 +1,7 @@
 .android-sdk/
 build/
 *.keystore
+*.jks
 *.idsig
 commandlinetools.zip
 *.log

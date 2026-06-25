@@ -227,6 +227,27 @@ app/src/main/res/values/strings.xml
 .\build-apk.ps1
 ```
 
+## Подпись APK
+
+Обычная локальная сборка использует debug-подпись:
+
+```powershell
+.\build-apk.ps1
+```
+
+Release-подпись не создается автоматически и не хранит пароль в репозитории. Для release-сборки нужно держать ключ вне проекта и передать параметры через переменные окружения:
+
+```powershell
+$env:MP3_SIGNING_MODE="release"
+$env:MP3_RELEASE_KEYSTORE="D:\keys\mp3-player-release.jks"
+$env:MP3_RELEASE_KEY_ALIAS="mp3player"
+$env:MP3_RELEASE_STORE_PASS="длинный_пароль_хранилища"
+$env:MP3_RELEASE_KEY_PASS="длинный_пароль_ключа"
+.\build-apk.ps1
+```
+
+Если release-ключ не найден или переменные не заданы, сборка завершается ошибкой. Это защищает от случайной публикации APK, подписанного слабым автоматически созданным ключом.
+
 ## Изменение package name
 
 Package name используется в двух местах:

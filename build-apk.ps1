@@ -66,7 +66,15 @@ $Aapt2 = Join-Path $SdkRoot "build-tools\$BuildTools\aapt2.exe"
 $D8 = Join-Path $SdkRoot "build-tools\$BuildTools\d8.bat"
 $ZipAlign = Join-Path $SdkRoot "build-tools\$BuildTools\zipalign.exe"
 $ApkSigner = Join-Path $SdkRoot "build-tools\$BuildTools\apksigner.bat"
-$KeyStore = Join-Path $Root "mp3player.keystore"
+$SigningMode = if ($env:MP3_SIGNING_MODE) { $env:MP3_SIGNING_MODE.ToLowerInvariant() } else { "debug" }
+
+function Require-Env($Name) {
+    $Value = [Environment]::GetEnvironmentVariable($Name)
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw "$Name is required for release signing."
+    }
+    return $Value
+}
 
 Require-Tool $AndroidJar "android.jar"
 Require-Tool $Aapt2 "aapt2"
@@ -114,16 +122,32 @@ Invoke-Checked { & $D8 --min-api 23 --classpath $AndroidJar --output $DexDir $Cl
 
 Invoke-Checked { & jar uf $UnsignedApk -C $DexDir classes.dex }
 
-if (-not (Test-Path -LiteralPath $KeyStore)) {
-    & keytool -genkeypair `
-        -keystore $KeyStore `
-        -storepass android `
-        -keypass android `
-        -alias mp3player `
-        -keyalg RSA `
-        -keysize 2048 `
-        -validity 10000 `
-        -dname "CN=MP3 Player, OU=Local, O=MP3 Player, L=Local, S=Local, C=RU"
+if ($SigningMode -eq "release") {
+    $KeyStore = Require-Env "MP3_RELEASE_KEYSTORE"
+    $KeyAlias = Require-Env "MP3_RELEASE_KEY_ALIAS"
+    $StorePass = Require-Env "MP3_RELEASE_STORE_PASS"
+    $KeyPass = Require-Env "MP3_RELEASE_KEY_PASS"
+    if (-not (Test-Path -LiteralPath $KeyStore)) {
+        throw "Release keystore not found: $KeyStore"
+    }
+} elseif ($SigningMode -eq "debug") {
+    $KeyStore = Join-Path $Root "mp3player.keystore"
+    $KeyAlias = "mp3player"
+    $StorePass = "android"
+    $KeyPass = "android"
+    if (-not (Test-Path -LiteralPath $KeyStore)) {
+        & keytool -genkeypair `
+            -keystore $KeyStore `
+            -storepass $StorePass `
+            -keypass $KeyPass `
+            -alias $KeyAlias `
+            -keyalg RSA `
+            -keysize 2048 `
+            -validity 10000 `
+            -dname "CN=MP3 Player Debug, OU=Local, O=MP3 Player, L=Local, S=Local, C=RU"
+    }
+} else {
+    throw "Unknown MP3_SIGNING_MODE '$SigningMode'. Use 'debug' or 'release'."
 }
 
 $AlignedApk = Join-Path $BuildDir "mp3-player-aligned.apk"
@@ -132,9 +156,9 @@ $SignedApk = Join-Path $OutputDir "MP3-Player.apk"
 Invoke-Checked { & $ZipAlign -f -p 4 $UnsignedApk $AlignedApk }
 Invoke-Checked { & $ApkSigner sign `
     --ks $KeyStore `
-    --ks-key-alias mp3player `
-    --ks-pass pass:android `
-    --key-pass pass:android `
+    --ks-key-alias $KeyAlias `
+    --ks-pass "pass:$StorePass" `
+    --key-pass "pass:$KeyPass" `
     --out $SignedApk `
     $AlignedApk }
 
