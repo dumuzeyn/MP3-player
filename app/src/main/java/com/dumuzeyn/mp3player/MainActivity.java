@@ -22,6 +22,7 @@ import android.os.Looper;
 import android.text.InputFilter;
 import android.text.TextUtils;
 import android.provider.OpenableColumns;
+import android.util.LruCache;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -55,6 +56,8 @@ public class MainActivity extends Activity {
     private static final String LANGUAGE = "language";
     private static final long MAX_AUDIO_BYTES = 220L * 1024L * 1024L;
     private static final int MAX_COVER_BYTES = 2 * 1024 * 1024;
+    private static final int COVER_THUMB_SIZE = 256;
+    private static final int COVER_PRELOAD_LIMIT = 36;
     private static final int PICK_AUDIO = 2001;
     private static final String PLAYLISTS = "playlists";
     private static final String PREFS = "mp3_player_ui";
@@ -83,7 +86,7 @@ public class MainActivity extends Activity {
     private final HashSet<String> favorites = new HashSet<>();
     private final ArrayList<Playlist> playlists = new ArrayList<>();
     private final ArrayList<Track> playbackQueue = new ArrayList<>();
-    private final HashMap<String, Bitmap> coverCache = new HashMap<>();
+    private final LruCache<String, Bitmap> coverCache = createCoverCache();
     private final Handler uiHandler = new Handler(Looper.getMainLooper());
     private final Handler playbackHandler = new Handler(Looper.getMainLooper());
     private final Handler sleepHandler = new Handler(Looper.getMainLooper());
@@ -106,6 +109,17 @@ public class MainActivity extends Activity {
     private String search = "";
     private boolean fullPlayerOpening = false;
 
+    private static LruCache<String, Bitmap> createCoverCache() {
+        int maxMemoryKb = (int) (Runtime.getRuntime().maxMemory() / 1024L);
+        int cacheSizeKb = Math.max(4 * 1024, maxMemoryKb / 16);
+        return new LruCache<String, Bitmap>(cacheSizeKb) {
+            @Override
+            protected int sizeOf(String key, Bitmap bitmap) {
+                return Math.max(1, bitmap.getByteCount() / 1024);
+            }
+        };
+    }
+
     private interface InputDone {
         void done(String str);
     }
@@ -124,7 +138,7 @@ public class MainActivity extends Activity {
         return mainActivity.bg;
     }
 
-    static HashMap m1$$Nest$fgetcoverCache(MainActivity mainActivity) {
+    static LruCache m1$$Nest$fgetcoverCache(MainActivity mainActivity) {
         return mainActivity.coverCache;
     }
 
@@ -3756,8 +3770,13 @@ public class MainActivity extends Activity {
         @Override
         public void run() {
             int i = 0;
+            int scanned = 0;
             for (Track track : new ArrayList<Track>(MainActivity.m19$$Nest$fgettracks(MainActivity.this))) {
-                if (!MainActivity.m1$$Nest$fgetcoverCache(MainActivity.this).containsKey(track.uri)) {
+                if (scanned >= COVER_PRELOAD_LIMIT) {
+                    break;
+                }
+                scanned++;
+                if (MainActivity.m1$$Nest$fgetcoverCache(MainActivity.this).get(track.uri) == null) {
                     Bitmap bitmapM65$$Nest$mreadCover = MainActivity.m65$$Nest$mreadCover(MainActivity.this, track);
                     if (bitmapM65$$Nest$mreadCover != null) {
                         synchronized (MainActivity.m1$$Nest$fgetcoverCache(MainActivity.this)) {
@@ -3807,8 +3826,9 @@ public class MainActivity extends Activity {
     }
 
     private Bitmap cover(Track track) {
-        if (this.coverCache.containsKey(track.uri)) {
-            return this.coverCache.get(track.uri);
+        Bitmap cached = this.coverCache.get(track.uri);
+        if (cached != null) {
+            return cached;
         }
         Bitmap cover = readCover(track);
         if (cover != null) {
@@ -3829,7 +3849,19 @@ public class MainActivity extends Activity {
                 }
                 return null;
             }
-            Bitmap bitmapDecodeByteArray = BitmapFactory.decodeByteArray(embeddedPicture, 0, embeddedPicture.length);
+            BitmapFactory.Options bounds = new BitmapFactory.Options();
+            bounds.inJustDecodeBounds = true;
+            BitmapFactory.decodeByteArray(embeddedPicture, 0, embeddedPicture.length, bounds);
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inSampleSize = coverSampleSize(bounds);
+            Bitmap bitmapDecodeByteArray = BitmapFactory.decodeByteArray(embeddedPicture, 0, embeddedPicture.length, options);
+            if (bitmapDecodeByteArray != null && (bitmapDecodeByteArray.getWidth() > COVER_THUMB_SIZE || bitmapDecodeByteArray.getHeight() > COVER_THUMB_SIZE)) {
+                Bitmap scaled = Bitmap.createScaledBitmap(bitmapDecodeByteArray, COVER_THUMB_SIZE, COVER_THUMB_SIZE, true);
+                if (scaled != bitmapDecodeByteArray) {
+                    bitmapDecodeByteArray.recycle();
+                }
+                bitmapDecodeByteArray = scaled;
+            }
             try {
                 mediaMetadataRetriever.release();
             } catch (Exception e2) {
@@ -3842,6 +3874,16 @@ public class MainActivity extends Activity {
             }
             return null;
         }
+    }
+
+    private int coverSampleSize(BitmapFactory.Options options) {
+        int sampleSize = 1;
+        int width = options.outWidth;
+        int height = options.outHeight;
+        while (width / sampleSize > COVER_THUMB_SIZE * 2 || height / sampleSize > COVER_THUMB_SIZE * 2) {
+            sampleSize *= 2;
+        }
+        return Math.max(1, sampleSize);
     }
 
     private View wave(Track track, boolean z) {
