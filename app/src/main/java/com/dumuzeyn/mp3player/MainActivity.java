@@ -2,9 +2,11 @@ package com.dumuzeyn.mp3player;
 
 import android.animation.ValueAnimator;
 import android.app.Activity;
+import android.content.ComponentName;
 import android.database.Cursor;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
@@ -102,6 +104,7 @@ public class MainActivity extends Activity {
     private boolean swipeStartedOnTabs = false;
     private boolean pageSwipeConsuming = false;
     private String search = "";
+    private boolean fullPlayerOpening = false;
 
     private interface InputDone {
         void done(String str);
@@ -450,6 +453,7 @@ public class MainActivity extends Activity {
         this.language = this.prefs.getString(LANGUAGE, "en");
         this.customTimerMinutes = this.prefs.getInt(CUSTOM_TIMER, 10);
         this.resumeWindowMinutes = Math.max(0, this.prefs.getInt(RESUME_WINDOW_MINUTES, 120));
+        updateLauncherIcon();
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission("android.permission.POST_NOTIFICATIONS") != 0) {
             requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 33);
         }
@@ -692,6 +696,20 @@ public class MainActivity extends Activity {
         this.muted = this.dark ? Color.rgb(190, 190, 190) : Color.rgb(80, 80, 80);
         this.line = this.dark ? Color.rgb(90, 90, 90) : Color.rgb(190, 190, 190);
         this.panel = this.bg;
+    }
+
+    private void updateLauncherIcon() {
+        PackageManager packageManager = getPackageManager();
+        int enabled = PackageManager.COMPONENT_ENABLED_STATE_ENABLED;
+        int disabled = PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+        int flags = PackageManager.DONT_KILL_APP;
+        ComponentName light = new ComponentName(this, getPackageName() + ".LauncherLight");
+        ComponentName dark = new ComponentName(this, getPackageName() + ".LauncherDark");
+        try {
+            packageManager.setComponentEnabledSetting(this.dark ? dark : light, enabled, flags);
+            packageManager.setComponentEnabledSetting(this.dark ? light : dark, disabled, flags);
+        } catch (Exception e) {
+        }
     }
 
     private void buildUi() {
@@ -1018,10 +1036,12 @@ public class MainActivity extends Activity {
                     @Override
                     public void run() {
                         view.animate().scaleX(1.0f).scaleY(1.0f).setDuration(60L).start();
+                        MainActivity.this.fullPlayerOpening = true;
                         MainActivity.m51$$Nest$mopenFullPlayer(MainActivity.this);
                     }
                 }).start();
             } else {
+                MainActivity.this.fullPlayerOpening = true;
                 MainActivity.m51$$Nest$mopenFullPlayer(MainActivity.this);
             }
         }
@@ -1183,6 +1203,7 @@ public class MainActivity extends Activity {
         public void onClick(View view) {
             MainActivity.m22$$Nest$fputdark(MainActivity.this, !MainActivity.m4$$Nest$fgetdark(MainActivity.this));
             MainActivity.m68$$Nest$msaveState(MainActivity.this);
+            MainActivity.this.updateLauncherIcon();
             MainActivity.m32$$Nest$mbuildUi(MainActivity.this);
         }
     }
@@ -1545,6 +1566,7 @@ public class MainActivity extends Activity {
         @Override
         public void onClick(View view) {
             MainActivity.m61$$Nest$mplayTrack(this.this$0, this.val$track);
+            this.this$0.fullPlayerOpening = true;
             MainActivity.m51$$Nest$mopenFullPlayer(this.this$0);
         }
     }
@@ -2096,6 +2118,7 @@ public class MainActivity extends Activity {
         public void onClick(View view) {
             MainActivity.m61$$Nest$mplayTrack(this.this$0, this.val$track);
             MainActivity.m9$$Nest$fgetoverlayHost(this.this$0).removeView(this.val$shade);
+            this.this$0.fullPlayerOpening = true;
             MainActivity.m51$$Nest$mopenFullPlayer(this.this$0);
         }
     }
@@ -3084,8 +3107,10 @@ public class MainActivity extends Activity {
         buttonIcon5.setOnClickListener(new AnonymousClass79(this, frameLayout));
         linearLayoutRow4.addView(buttonIcon5, square(68));
         linearLayout.addView(linearLayoutRow4, new LinearLayout.LayoutParams(-1, dp(112)));
+        boolean animateOpen = this.animations && this.fullPlayerOpening;
+        this.fullPlayerOpening = false;
         this.overlayHost.addView(frameLayout, new FrameLayout.LayoutParams(-1, -1));
-        if (this.animations) {
+        if (animateOpen) {
             frameLayout.setTranslationY(getResources().getDisplayMetrics().heightPixels);
             frameLayout.animate().translationY(0.0f).setDuration(145L).setInterpolator(new DecelerateInterpolator()).start();
         }

@@ -359,7 +359,8 @@ public class PlayerService extends Service {
         } else {
             track = new Track("", "MP3 Player", "Музыка готова");
         }
-        PendingIntent activity = PendingIntent.getActivity(this, 1, new Intent(this, (Class<?>) MainActivity.class), 201326592);
+        Class<?> launchClass = "dark".equals(getSharedPreferences("mp3_player_ui", 0).getString("theme", "light")) ? DarkMainActivity.class : MainActivity.class;
+        PendingIntent activity = PendingIntent.getActivity(this, 1, new Intent(this, launchClass), 201326592);
         if (Build.VERSION.SDK_INT >= 26) {
             builder = new Notification.Builder(this, CHANNEL_ID);
         } else {
