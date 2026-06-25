@@ -248,6 +248,12 @@ $env:MP3_RELEASE_KEY_PASS="длинный_пароль_ключа"
 
 Если release-ключ не найден или переменные не заданы, сборка завершается ошибкой. Это защищает от случайной публикации APK, подписанного слабым автоматически созданным ключом.
 
+## Gradle и Android Studio
+
+В репозитории есть стандартные Gradle-файлы: `settings.gradle`, `build.gradle`, `app/build.gradle` и Gradle Wrapper. Android Studio должна открывать проект как обычное Android-приложение.
+
+Для Gradle-сборки нужен JDK 17. На машине, где установлен только JDK 24, wrapper может завершиться ошибкой `Unsupported class file major version 68`; в таком случае нужно выбрать JDK 17 в настройках Android Studio или в `JAVA_HOME`.
+
 ## Изменение package name
 
 Package name используется в двух местах:
