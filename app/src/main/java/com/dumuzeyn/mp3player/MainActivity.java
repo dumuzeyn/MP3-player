@@ -1088,12 +1088,6 @@ public class MainActivity extends Activity {
         linearLayout.addView(textViewText, new LinearLayout.LayoutParams(-1, dp(48)));
         if (this.tabIndex == 0 || this.tabIndex == 1) {
             LinearLayout linearLayoutRow = row();
-            Button buttonIcon = icon(isPlayingSource(currentVisibleTracks()) ? "Ⅱ" : "▶");
-            buttonIcon.setOnClickListener(new AnonymousClass9());
-            linearLayoutRow.addView(buttonIcon, square(52));
-            Button buttonShuffleButton = shuffleButton();
-            buttonShuffleButton.setOnClickListener(new AnonymousClass10());
-            linearLayoutRow.addView(buttonShuffleButton, square(52));
             if (this.tabIndex == 0) {
                 Button buttonIcon2 = icon("+");
                 buttonIcon2.setOnClickListener(new AnonymousClass11());
@@ -1106,6 +1100,12 @@ public class MainActivity extends Activity {
             Button buttonSearchButton = searchButton();
             buttonSearchButton.setOnClickListener(new AnonymousClass13());
             linearLayoutRow.addView(buttonSearchButton, square(52));
+            Button buttonIcon = icon(isPlayingSource(currentVisibleTracks()) ? "Ⅱ" : "▶");
+            buttonIcon.setOnClickListener(new AnonymousClass9());
+            linearLayoutRow.addView(buttonIcon, square(52));
+            Button buttonShuffleButton = shuffleButton();
+            buttonShuffleButton.setOnClickListener(new AnonymousClass10());
+            linearLayoutRow.addView(buttonShuffleButton, square(52));
             linearLayout.addView(linearLayoutRow, new LinearLayout.LayoutParams(-1, dp(62)));
         } else if (this.tabIndex == 2) {
             LinearLayout linearLayoutRow2 = row();
@@ -1654,12 +1654,9 @@ public class MainActivity extends Activity {
             linearLayout2.addView(textViewText2);
             linearLayout2.addView(textViewText3);
             linearLayoutRow.addView(linearLayout2, new LinearLayout.LayoutParams(0, -2, 1.0f));
-            Button buttonIcon = icon(isPlayingSource(arrayListPlaylistTracks) ? "Ⅱ" : "▶");
-            buttonIcon.setOnClickListener(new AnonymousClass28(this, playlist2));
-            linearLayoutRow.addView(buttonIcon, square(48));
-            Button buttonShuffleButton = shuffleButton();
-            buttonShuffleButton.setOnClickListener(new AnonymousClass29(this, playlist2));
-            linearLayoutRow.addView(buttonShuffleButton, square(48));
+            Button buttonIcon2 = icon("×");
+            buttonIcon2.setOnClickListener(new AnonymousClass30(this, playlist2));
+            linearLayoutRow.addView(buttonIcon2, square(48));
             Button rename = icon("✎");
             rename.setOnClickListener(new View.OnClickListener() {
                 @Override
@@ -1668,9 +1665,12 @@ public class MainActivity extends Activity {
                 }
             });
             linearLayoutRow.addView(rename, square(48));
-            Button buttonIcon2 = icon("×");
-            buttonIcon2.setOnClickListener(new AnonymousClass30(this, playlist2));
-            linearLayoutRow.addView(buttonIcon2, square(48));
+            Button buttonIcon = icon(isPlayingSource(arrayListPlaylistTracks) ? "Ⅱ" : "▶");
+            buttonIcon.setOnClickListener(new AnonymousClass28(this, playlist2));
+            linearLayoutRow.addView(buttonIcon, square(48));
+            Button buttonShuffleButton = shuffleButton();
+            buttonShuffleButton.setOnClickListener(new AnonymousClass29(this, playlist2));
+            linearLayoutRow.addView(buttonShuffleButton, square(48));
             linearLayout.addView(linearLayoutRow);
             LinearLayout linearLayoutRow2 = row();
             ImageView imageViewCoverView = coverView();
