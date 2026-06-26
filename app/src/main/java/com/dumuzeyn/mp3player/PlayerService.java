@@ -70,8 +70,6 @@ public class PlayerService extends Service {
     private int currentIndex = -1;
     private boolean oneShot = false;
     private boolean shuffle = false;
-    private boolean preparing = false;
-    private int consecutiveErrors = 0;
     private int loopMode = 0;
     private final AudioManager.OnAudioFocusChangeListener audioFocusChangeListener = new AudioManager.OnAudioFocusChangeListener() {
         @Override
@@ -260,18 +258,10 @@ public class PlayerService extends Service {
         this.currentIndex = Math.max(0, Math.min(i, this.queue.size() - 1));
         releasePlayer();
         this.player = new MediaPlayer();
-        this.preparing = true;
         try {
             this.player.setAudioAttributes(new AudioAttributes.Builder().setContentType(2).setUsage(1).build());
             this.player.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
             this.player.setDataSource(this, this.queue.get(this.currentIndex).asUri());
-            final int position = startPosition;
-            this.player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-                @Override
-                public void onPrepared(MediaPlayer mediaPlayer) {
-                    PlayerService.this.startPreparedPlayer(mediaPlayer, position);
-                }
-            });
             this.player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mediaPlayer) {
@@ -281,62 +271,33 @@ public class PlayerService extends Service {
             this.player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mediaPlayer, int what, int extra) {
-                    return PlayerService.this.handlePlayerError(what, extra);
+                    PlayerService.this.stopPlayback();
+                    PlayerService.this.stopSelf();
+                    return true;
                 }
             });
-            updateState();
-            startForeground(NOTIFICATION_ID, buildNotification());
-            this.player.prepareAsync();
-        } catch (Exception e) {
-            this.preparing = false;
-            handlePlayerError(0, 0);
-        }
-    }
-
-    private void startPreparedPlayer(MediaPlayer mediaPlayer, int startPosition) {
-        if (this.player != mediaPlayer) {
-            return;
-        }
-        this.preparing = false;
-        try {
+            this.player.prepare();
+            if (startPosition > 0) {
+                this.player.seekTo(Math.max(0, Math.min(startPosition, this.player.getDuration())));
+            }
             if (!requestAudioFocus()) {
-                releasePlayer();
-                updateState();
-                startForeground(NOTIFICATION_ID, buildNotification());
+                stopPlayback();
                 return;
             }
-            if (startPosition > 0) {
-                mediaPlayer.seekTo(Math.max(0, Math.min(startPosition, mediaPlayer.getDuration())));
-            }
-            this.consecutiveErrors = 0;
-            mediaPlayer.start();
-            mediaPlayer.setVolume(1.0f, 1.0f);
+            this.player.start();
+            this.player.setVolume(1.0f, 1.0f);
             updateState();
             saveResumeState(true, false);
             updateNoisyReceiver();
             startForeground(NOTIFICATION_ID, buildNotification());
         } catch (Exception e) {
-            handlePlayerError(0, 0);
+            stopPlayback();
+            stopSelf();
         }
-    }
-
-    private boolean handlePlayerError(int what, int extra) {
-        this.preparing = false;
-        releasePlayer();
-        updateState();
-        this.consecutiveErrors++;
-        if (!this.oneShot && !this.queue.isEmpty() && this.consecutiveErrors < this.queue.size()) {
-            playIndex((this.currentIndex + 1) % this.queue.size());
-            return true;
-        }
-        this.consecutiveErrors = 0;
-        stopPlayback();
-        stopSelf();
-        return true;
     }
 
     private void restorePlaybackAfterProcessDeath() {
-        if (this.player != null || this.preparing) {
+        if (this.player != null) {
             return;
         }
         SharedPreferences prefs = getSharedPreferences(RESUME_PREFS, 0);
@@ -413,9 +374,6 @@ public class PlayerService extends Service {
             playIndex(this.currentIndex < 0 ? 0 : this.currentIndex);
             return;
         }
-        if (this.preparing) {
-            return;
-        }
         if (!safeIsPlaying()) {
             if (!requestAudioFocus()) {
                 return;
@@ -484,7 +442,6 @@ public class PlayerService extends Service {
     }
 
     private void releasePlayer() {
-        this.preparing = false;
         if (this.player == null) {
             return;
         }

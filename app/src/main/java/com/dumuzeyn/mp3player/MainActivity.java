@@ -57,8 +57,6 @@ public class MainActivity extends Activity {
     private static final long MAX_AUDIO_BYTES = 220L * 1024L * 1024L;
     private static final int MAX_COVER_BYTES = 2 * 1024 * 1024;
     private static final int COVER_THUMB_SIZE = 256;
-    private static final int FULL_PLAYER_COVER_SIZE = 900;
-    private static final int COVER_PRELOAD_LIMIT = 36;
     private static final int PICK_AUDIO = 2001;
     private static final String PLAYLISTS = "playlists";
     private static final String PREFS = "mp3_player_ui";
@@ -492,7 +490,6 @@ public class MainActivity extends Activity {
         restoreRecentPlayback();
         buildUi();
         refreshMissingMetadataAsync();
-        preloadCoverCacheAsync();
     }
 
     @Override
@@ -1689,7 +1686,7 @@ public class MainActivity extends Activity {
         linearLayout.setPadding(dp(10), dp(8), dp(10), dp(8));
         setSurface(linearLayout, isCurrent(track) ? this.fg : this.panel, false);
         ImageView imageViewCoverView = coverView();
-        Bitmap bitmapCachedCover = cachedCover(track);
+        Bitmap bitmapCachedCover = cover(track);
         if (bitmapCachedCover != null) {
             imageViewCoverView.setImageBitmap(bitmapCachedCover);
         } else {
@@ -1853,7 +1850,7 @@ public class MainActivity extends Activity {
             linearLayout.addView(linearLayoutRow);
             LinearLayout linearLayoutRow2 = row();
             ImageView imageViewCoverView = coverView();
-            Bitmap bitmapCachedCover = arrayListPlaylistTracks.isEmpty() ? null : cachedCover(arrayListPlaylistTracks.get(0));
+            Bitmap bitmapCachedCover = arrayListPlaylistTracks.isEmpty() ? null : cover(arrayListPlaylistTracks.get(0));
             if (bitmapCachedCover != null) {
                 imageViewCoverView.setImageBitmap(bitmapCachedCover);
             } else {
@@ -1981,7 +1978,7 @@ public class MainActivity extends Activity {
             linearLayoutRow.setPadding(dp(12), dp(12), dp(12), dp(12));
             setSurface(linearLayoutRow, this.panel, false);
             ImageView imageViewCoverView = coverView();
-            Bitmap bitmapCachedCover = entry.getValue().isEmpty() ? null : cachedCover(entry.getValue().get(0));
+            Bitmap bitmapCachedCover = entry.getValue().isEmpty() ? null : cover(entry.getValue().get(0));
             if (bitmapCachedCover != null) {
                 imageViewCoverView.setImageBitmap(bitmapCachedCover);
             } else {
@@ -2164,7 +2161,7 @@ public class MainActivity extends Activity {
                 linearLayout2.setPadding(dp(10), dp(8), dp(10), dp(8));
                 setSurface(linearLayout2, isCurrent(track) ? this.fg : this.panel, false);
                 ImageView imageViewCoverView = coverView();
-                Bitmap bitmapCachedCover = cachedCover(track);
+                Bitmap bitmapCachedCover = cover(track);
                 if (bitmapCachedCover != null) {
                     imageViewCoverView.setImageBitmap(bitmapCachedCover);
                 } else {
@@ -2401,7 +2398,7 @@ public class MainActivity extends Activity {
             linearLayout2.setPadding(dp(10), dp(8), dp(10), dp(8));
             setSurface(linearLayout2, isCurrent(track) ? this.fg : this.panel, false);
             ImageView imageViewCoverView = coverView();
-            Bitmap bitmapCachedCover = cachedCover(track);
+            Bitmap bitmapCachedCover = cover(track);
             if (bitmapCachedCover != null) {
                 imageViewCoverView.setImageBitmap(bitmapCachedCover);
             }
@@ -2670,7 +2667,7 @@ public class MainActivity extends Activity {
         linearLayout.setPadding(dp(10), dp(8), dp(10), dp(8));
         setSurface(linearLayout, hashSet.contains(track.uri) ? this.fg : this.panel, false);
         ImageView imageViewCoverView = coverView();
-        Bitmap bitmapCachedCover = cachedCover(track);
+        Bitmap bitmapCachedCover = cover(track);
         if (bitmapCachedCover != null) {
             imageViewCoverView.setImageBitmap(bitmapCachedCover);
         } else {
@@ -3261,7 +3258,7 @@ public class MainActivity extends Activity {
         linearLayoutRow.addView(buttonIcon2, square(58));
         linearLayout.addView(linearLayoutRow, new LinearLayout.LayoutParams(-1, dp(72)));
         ImageView imageViewCoverView = coverView();
-        Bitmap bitmapCover = fullPlayerCover(track);
+        Bitmap bitmapCover = cover(track);
         if (bitmapCover != null) {
             imageViewCoverView.setImageBitmap(bitmapCover);
         } else {
@@ -3934,69 +3931,6 @@ public class MainActivity extends Activity {
         return null;
     }
 
-    private Bitmap cachedCover(Track track) {
-        return this.coverCache.get(track.uri);
-    }
-
-    class AnonymousClass86 implements Runnable {
-        AnonymousClass86() {
-        }
-
-        @Override
-        public void run() {
-            int i = 0;
-            int scanned = 0;
-            for (Track track : new ArrayList<Track>(MainActivity.m19$$Nest$fgettracks(MainActivity.this))) {
-                scanned++;
-                if (MainActivity.m1$$Nest$fgetcoverCache(MainActivity.this).get(track.uri) == null) {
-                    Bitmap bitmapM65$$Nest$mreadCover = MainActivity.m65$$Nest$mreadCover(MainActivity.this, track);
-                    if (bitmapM65$$Nest$mreadCover != null) {
-                        synchronized (MainActivity.m1$$Nest$fgetcoverCache(MainActivity.this)) {
-                            MainActivity.m1$$Nest$fgetcoverCache(MainActivity.this).put(track.uri, bitmapM65$$Nest$mreadCover);
-                        }
-                        i++;
-                    }
-                    if (i > 0 && i % 12 == 0) {
-                        MainActivity.this.runOnUiThread(new AnonymousClass1());
-                    }
-                }
-            }
-            if (i > 0) {
-                MainActivity.this.runOnUiThread(new AnonymousClass2());
-            }
-        }
-
-        class AnonymousClass1 implements Runnable {
-            AnonymousClass1() {
-            }
-
-            @Override
-            public void run() {
-                if (MainActivity.m9$$Nest$fgetoverlayHost(MainActivity.this) == null || MainActivity.m9$$Nest$fgetoverlayHost(MainActivity.this).getChildCount() != 0) {
-                    return;
-                }
-                MainActivity.m67$$Nest$mrender(MainActivity.this);
-            }
-        }
-
-        class AnonymousClass2 implements Runnable {
-            AnonymousClass2() {
-            }
-
-            @Override
-            public void run() {
-                if (MainActivity.m9$$Nest$fgetoverlayHost(MainActivity.this) == null || MainActivity.m9$$Nest$fgetoverlayHost(MainActivity.this).getChildCount() != 0) {
-                    return;
-                }
-                MainActivity.m67$$Nest$mrender(MainActivity.this);
-            }
-        }
-    }
-
-    private void preloadCoverCacheAsync() {
-        new Thread(new AnonymousClass86()).start();
-    }
-
     private Bitmap cover(Track track) {
         Bitmap cached = this.coverCache.get(track.uri);
         if (cached != null) {
@@ -4011,11 +3945,6 @@ public class MainActivity extends Activity {
 
     private Bitmap readCover(Track track) {
         return readCover(track, COVER_THUMB_SIZE);
-    }
-
-    private Bitmap fullPlayerCover(Track track) {
-        Bitmap cover = readCover(track, FULL_PLAYER_COVER_SIZE);
-        return cover == null ? cachedCover(track) : cover;
     }
 
     private Bitmap readCover(Track track, int maxSize) {
