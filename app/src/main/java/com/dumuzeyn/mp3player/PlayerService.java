@@ -40,13 +40,16 @@ public class PlayerService extends Service {
     public static final String EXTRA_ONE_SHOT = "oneShot";
     public static final String EXTRA_POSITION = "position";
     public static final String EXTRA_QUEUE_URIS = "queueUris";
+    public static final String EXTRA_SHUFFLE = "shuffle";
     public static final String RESUME_DURATION = "duration";
+    public static final String RESUME_INDEX = "index";
     public static final String RESUME_LOOP_MODE = "loopMode";
     public static final String RESUME_PLAYING = "playing";
     public static final String RESUME_POSITION = "position";
     public static final String RESUME_PREFS = "player_resume";
     public static final String RESUME_QUEUE = "queue";
     public static final String RESUME_SAVED_AT = "savedAt";
+    public static final String RESUME_SHUFFLE = "shuffle";
     public static final String RESUME_URI = "uri";
     private static final int NOTIFICATION_ID = 7;
     private static PlayerService instance;
@@ -66,6 +69,9 @@ public class PlayerService extends Service {
     private final ArrayList<Track> queue = new ArrayList<>();
     private int currentIndex = -1;
     private boolean oneShot = false;
+    private boolean shuffle = false;
+    private boolean preparing = false;
+    private int consecutiveErrors = 0;
     private int loopMode = 0;
     private final AudioManager.OnAudioFocusChangeListener audioFocusChangeListener = new AudioManager.OnAudioFocusChangeListener() {
         @Override
@@ -168,43 +174,48 @@ public class PlayerService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int i, int i2) {
-        String action = intent == null ? "" : intent.getAction();
         startForeground(NOTIFICATION_ID, buildNotification());
+        if (intent == null) {
+            restorePlaybackAfterProcessDeath();
+            return START_STICKY;
+        }
+        String action = intent.getAction();
         if (ACTION_PLAY_INDEX.equals(action)) {
             this.oneShot = intent.getBooleanExtra(EXTRA_ONE_SHOT, false);
+            this.shuffle = intent.getBooleanExtra(EXTRA_SHUFFLE, false);
             playIndex(intent.getIntExtra(EXTRA_INDEX, 0), intent.getStringArrayListExtra(EXTRA_QUEUE_URIS), intent.getIntExtra(EXTRA_POSITION, 0));
-            return 1;
+            return START_STICKY;
         }
         if (ACTION_TOGGLE.equals(action)) {
             toggle();
-            return 1;
+            return START_STICKY;
         }
         if (ACTION_NEXT.equals(action)) {
             this.oneShot = false;
             playNext();
-            return 1;
+            return START_STICKY;
         }
         if (ACTION_PREV.equals(action)) {
             this.oneShot = false;
             playPrevious();
-            return 1;
+            return START_STICKY;
         }
         if (ACTION_SEEK.equals(action)) {
             seekTo(intent.getIntExtra(EXTRA_POSITION, 0));
-            return 1;
+            return START_STICKY;
         }
         if (ACTION_LOOP.equals(action)) {
             this.loopMode = intent.getIntExtra(EXTRA_LOOP_MODE, 0);
             lastLoopMode = this.loopMode;
             startForeground(NOTIFICATION_ID, buildNotification());
-            return 1;
+            return START_STICKY;
         }
         if (ACTION_STOP.equals(action)) {
             stopPlayback();
             stopSelf();
-            return 1;
+            return START_STICKY;
         }
-        return 1;
+        return START_STICKY;
     }
 
     @Override
@@ -249,10 +260,18 @@ public class PlayerService extends Service {
         this.currentIndex = Math.max(0, Math.min(i, this.queue.size() - 1));
         releasePlayer();
         this.player = new MediaPlayer();
+        this.preparing = true;
         try {
             this.player.setAudioAttributes(new AudioAttributes.Builder().setContentType(2).setUsage(1).build());
             this.player.setWakeMode(getApplicationContext(), PowerManager.PARTIAL_WAKE_LOCK);
             this.player.setDataSource(this, this.queue.get(this.currentIndex).asUri());
+            final int position = startPosition;
+            this.player.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+                @Override
+                public void onPrepared(MediaPlayer mediaPlayer) {
+                    PlayerService.this.startPreparedPlayer(mediaPlayer, position);
+                }
+            });
             this.player.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mediaPlayer) {
@@ -262,29 +281,103 @@ public class PlayerService extends Service {
             this.player.setOnErrorListener(new MediaPlayer.OnErrorListener() {
                 @Override
                 public boolean onError(MediaPlayer mediaPlayer, int what, int extra) {
-                    PlayerService.this.stopPlayback();
-                    PlayerService.this.stopSelf();
-                    return true;
+                    return PlayerService.this.handlePlayerError(what, extra);
                 }
             });
-            this.player.prepare();
-            if (startPosition > 0) {
-                this.player.seekTo(Math.max(0, Math.min(startPosition, this.player.getDuration())));
-            }
+            updateState();
+            startForeground(NOTIFICATION_ID, buildNotification());
+            this.player.prepareAsync();
+        } catch (Exception e) {
+            this.preparing = false;
+            handlePlayerError(0, 0);
+        }
+    }
+
+    private void startPreparedPlayer(MediaPlayer mediaPlayer, int startPosition) {
+        if (this.player != mediaPlayer) {
+            return;
+        }
+        this.preparing = false;
+        try {
             if (!requestAudioFocus()) {
-                stopPlayback();
+                releasePlayer();
+                updateState();
+                startForeground(NOTIFICATION_ID, buildNotification());
                 return;
             }
-            this.player.start();
-            this.player.setVolume(1.0f, 1.0f);
+            if (startPosition > 0) {
+                mediaPlayer.seekTo(Math.max(0, Math.min(startPosition, mediaPlayer.getDuration())));
+            }
+            this.consecutiveErrors = 0;
+            mediaPlayer.start();
+            mediaPlayer.setVolume(1.0f, 1.0f);
             updateState();
             saveResumeState(true, false);
             updateNoisyReceiver();
             startForeground(NOTIFICATION_ID, buildNotification());
         } catch (Exception e) {
-            stopPlayback();
-            stopSelf();
+            handlePlayerError(0, 0);
         }
+    }
+
+    private boolean handlePlayerError(int what, int extra) {
+        this.preparing = false;
+        releasePlayer();
+        updateState();
+        this.consecutiveErrors++;
+        if (!this.oneShot && !this.queue.isEmpty() && this.consecutiveErrors < this.queue.size()) {
+            playIndex((this.currentIndex + 1) % this.queue.size());
+            return true;
+        }
+        this.consecutiveErrors = 0;
+        stopPlayback();
+        stopSelf();
+        return true;
+    }
+
+    private void restorePlaybackAfterProcessDeath() {
+        if (this.player != null || this.preparing) {
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences(RESUME_PREFS, 0);
+        if (!prefs.getBoolean(RESUME_PLAYING, false)) {
+            return;
+        }
+        JSONArray savedQueue;
+        try {
+            savedQueue = new JSONArray(prefs.getString(RESUME_QUEUE, "[]"));
+        } catch (Exception e) {
+            savedQueue = new JSONArray();
+        }
+        ArrayList<Track> allTracks = TrackStore.load(this);
+        Map<String, Track> tracksByUri = new HashMap<>();
+        Iterator<Track> iterator = allTracks.iterator();
+        while (iterator.hasNext()) {
+            Track track = iterator.next();
+            tracksByUri.put(track.uri, track);
+        }
+        this.queue.clear();
+        for (int index = 0; index < savedQueue.length(); index++) {
+            Track track = tracksByUri.get(savedQueue.optString(index, ""));
+            if (track != null) {
+                this.queue.add(track);
+            }
+        }
+        if (this.queue.isEmpty()) {
+            Track track = tracksByUri.get(prefs.getString(RESUME_URI, ""));
+            if (track != null) {
+                this.queue.add(track);
+            }
+        }
+        if (this.queue.isEmpty()) {
+            return;
+        }
+        this.loopMode = prefs.getInt(RESUME_LOOP_MODE, 0);
+        this.shuffle = prefs.getBoolean(RESUME_SHUFFLE, false);
+        this.oneShot = false;
+        int index = prefs.getInt(RESUME_INDEX, 0);
+        int position = Math.max(0, prefs.getInt(RESUME_POSITION, 0));
+        playIndex(Math.max(0, Math.min(index, this.queue.size() - 1)), null, position);
     }
 
     private void lambda$playIndex$0(MediaPlayer mediaPlayer) {
@@ -318,6 +411,9 @@ public class PlayerService extends Service {
     private void play() {
         if (this.player == null) {
             playIndex(this.currentIndex < 0 ? 0 : this.currentIndex);
+            return;
+        }
+        if (this.preparing) {
             return;
         }
         if (!safeIsPlaying()) {
@@ -377,6 +473,7 @@ public class PlayerService extends Service {
 
     private void stopPlayback() {
         updateState();
+        lastPlaying = false;
         saveResumeState(true, false);
         releasePlayer();
         this.currentIndex = -1;
@@ -387,6 +484,7 @@ public class PlayerService extends Service {
     }
 
     private void releasePlayer() {
+        this.preparing = false;
         if (this.player == null) {
             return;
         }
@@ -424,8 +522,10 @@ public class PlayerService extends Service {
         edit.putString(RESUME_URI, this.queue.get(this.currentIndex).uri);
         edit.putInt(RESUME_POSITION, Math.max(0, lastPosition));
         edit.putInt(RESUME_DURATION, Math.max(0, lastDuration));
+        edit.putInt(RESUME_INDEX, Math.max(0, this.currentIndex));
         edit.putInt(RESUME_LOOP_MODE, this.loopMode);
         edit.putBoolean(RESUME_PLAYING, lastPlaying);
+        edit.putBoolean(RESUME_SHUFFLE, this.shuffle);
         edit.putLong(RESUME_SAVED_AT, System.currentTimeMillis());
         if (includeQueue || !queueJson.equals(this.lastSavedQueueJson)) {
             edit.putString(RESUME_QUEUE, queueJson);

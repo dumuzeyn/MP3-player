@@ -103,6 +103,7 @@ public class MainActivity extends Activity {
     private long sleepTimerEndsAt = 0;
     private boolean dark = false;
     private boolean animations = true;
+    private boolean shuffleMode = false;
     private String language = "en";
     private String themeMode = "light";
     private int customBg = -1;
@@ -3711,6 +3712,7 @@ public class MainActivity extends Activity {
         }
         this.playbackQueue.clear();
         this.playbackQueue.add(track);
+        this.shuffleMode = false;
         this.currentIndex = iIndexOf;
         this.playing = true;
         this.resumePosition = 0;
@@ -3736,6 +3738,7 @@ public class MainActivity extends Activity {
         }
         this.playbackQueue.clear();
         this.playbackQueue.addAll(arrayList2);
+        this.shuffleMode = z;
         this.currentIndex = iIndexOf;
         this.playing = true;
         this.resumePosition = 0;
@@ -3849,6 +3852,7 @@ public class MainActivity extends Activity {
         intent.setAction(str);
         intent.putExtra(PlayerService.EXTRA_INDEX, i);
         intent.putExtra(PlayerService.EXTRA_ONE_SHOT, z);
+        intent.putExtra(PlayerService.EXTRA_SHUFFLE, this.shuffleMode);
         intent.putExtra(PlayerService.EXTRA_POSITION, Math.max(0, position));
         intent.putStringArrayListExtra(PlayerService.EXTRA_QUEUE_URIS, queueUris());
         if (Build.VERSION.SDK_INT < 26) {
